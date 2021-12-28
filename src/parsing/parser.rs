@@ -7,6 +7,8 @@ use std::i32;
 use std::hash::BuildHasherDefault;
 use fnv::FnvHasher;
 use crate::parsing::syntax_set::{SyntaxSet, SyntaxReference};
+use std::sync::atomic::{Ordering, AtomicBool};
+use std::sync::Arc;
 
 /// Keeps the current parser state (the internal syntax interpreter stack) between lines of parsing.
 ///
@@ -163,6 +165,11 @@ impl ParseState {
         }
     }
 
+    pub fn parse_line(&mut self, line: &str, syntax_set: &SyntaxSet) -> Vec<(usize, ScopeStackOp)> {
+        let interrupt = Arc::new(AtomicBool::new(false));
+        self.parse_line_2(line, syntax_set, interrupt)
+    }
+
     /// Parses a single line of the file. Because of the way regex engines work you unfortunately
     /// have to pass in a single line contiguous in memory. This can be bad for really long lines.
     /// Sublime Text avoids this by just not highlighting lines that are too long (thousands of characters).
@@ -182,7 +189,7 @@ impl ParseState {
     /// [`ScopeStack::apply`]: struct.ScopeStack.html#method.apply
     /// [`SyntaxSet`]: struct.SyntaxSet.html
     /// [`ParseState`]: struct.ParseState.html
-    pub fn parse_line(&mut self, line: &str, syntax_set: &SyntaxSet) -> Vec<(usize, ScopeStackOp)> {
+    pub fn parse_line_2(&mut self, line: &str, syntax_set: &SyntaxSet, interrupt: Arc<AtomicBool>) -> Vec<(usize, ScopeStackOp)> {
         assert!(!self.stack.is_empty(),
                 "Somehow main context was popped from the stack");
         let mut match_start = 0;
@@ -211,7 +218,11 @@ impl ParseState {
             &mut regions,
             &mut non_consuming_push_at,
             &mut res
-        ) {}
+        ) {
+            if interrupt.load(Ordering::Relaxed) {
+                eprintln!("Trying to parse next token, match_start={:?}, line='{:?}'", match_start, line);
+            }
+        }
 
         res
     }
