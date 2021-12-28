@@ -167,7 +167,7 @@ impl ParseState {
 
     pub fn parse_line(&mut self, line: &str, syntax_set: &SyntaxSet) -> Vec<(usize, ScopeStackOp)> {
         let interrupt = Arc::new(AtomicBool::new(false));
-        self.parse_line_2(line, syntax_set, interrupt)
+        self.parse_line_2(line, syntax_set, interrupt, 0, "")
     }
 
     /// Parses a single line of the file. Because of the way regex engines work you unfortunately
@@ -189,7 +189,8 @@ impl ParseState {
     /// [`ScopeStack::apply`]: struct.ScopeStack.html#method.apply
     /// [`SyntaxSet`]: struct.SyntaxSet.html
     /// [`ParseState`]: struct.ParseState.html
-    pub fn parse_line_2(&mut self, line: &str, syntax_set: &SyntaxSet, interrupt: Arc<AtomicBool>) -> Vec<(usize, ScopeStackOp)> {
+    pub fn parse_line_2(&mut self, line: &str, syntax_set: &SyntaxSet, interrupt: Arc<AtomicBool>,
+    line_number: usize, filepath: &str) -> Vec<(usize, ScopeStackOp)> {
         assert!(!self.stack.is_empty(),
                 "Somehow main context was popped from the stack");
         let mut match_start = 0;
@@ -220,7 +221,7 @@ impl ParseState {
             &mut res
         ) {
             if interrupt.load(Ordering::Relaxed) {
-                eprintln!("Trying to parse next token, match_start={:?}, line='{:?}'", match_start, line);
+                eprintln!("Trying to parse next token, match_start={:?}, line_num={:?}, filepath={:?}, line='{:?}'", match_start, line_number, filepath, line);
             }
         }
 
